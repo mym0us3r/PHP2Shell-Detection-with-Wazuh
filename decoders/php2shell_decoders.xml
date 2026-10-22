@@ -12,6 +12,14 @@
     ref="%{Referer}i" ua="%{User-Agent}i" ct="%{Content-Type}i"
     te="%{Transfer-Encoding}i" cl="%{Content-Length}i" sc="%{Set-Cookie}o"
 
+  Cookies are never extracted in full. A sibling decoder stores only the first 8 characters of a PHPSESSID
+  response cookie in phpsessid_prefix, enough to see the shape of an anomalous
+  value (percent-encoded bytes, odd characters) without putting a usable
+  session identifier or leaked memory into the alert. Wazuh treats decoders with
+  the same name that follow each other under the same parent as siblings and
+  evaluates them in parallel, so both decoders below are named
+  php2shell-accesslog-fields and must stay adjacent.
+
   The quoted-string fragment "(?:[^"\\]|\\.)*" accepts the backslash-escaped
   quotes that Apache writes inside logged header values.
 -->
@@ -24,4 +32,10 @@
   <parent>php2shell-accesslog</parent>
   <regex type="pcre2">^php2shell ip=(\S+) ts="[^"]*" req="(\S+) (\S+) (?:[^"\\]|\\.)*" status=(\d{3}) bytes=\S+ ref="(?:[^"\\]|\\.)*" ua="(?:[^"\\]|\\.)*" ct="((?:[^"\\]|\\.)*)" te="((?:[^"\\]|\\.)*)" cl="((?:[^"\\]|\\.)*)" sc=".*"$</regex>
   <order>srcip,protocol,url,id,content_type,transfer_encoding,content_length</order>
+</decoder>
+
+<decoder name="php2shell-accesslog-fields">
+  <parent>php2shell-accesslog</parent>
+  <regex type="pcre2">(?:sc="|, )PHPSESSID=([^;,\s"]{1,8})</regex>
+  <order>phpsessid_prefix</order>
 </decoder>
