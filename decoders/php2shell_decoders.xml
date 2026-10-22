@@ -1,0 +1,27 @@
+<!--
+  Decoders for the PHP2Shell Apache access log (custom LogFormat "php2shell").
+  Author: Kislley Rodrigues - Wazuh Ambassador
+
+  The line is key=value with no square brackets on purpose. The native
+  web-accesslog decoder prematch requires '] "METHOD URL HTTP/x" ' and its
+  '\.*' absorbs extra tokens, so a combined-style prefix is decoded by the
+  native decoder and the extra fields at the end are ignored.
+
+  LogFormat:
+    php2shell ip=%h ts="%{%Y-%m-%dT%H:%M:%S%z}t" req="%r" status=%>s bytes=%O
+    ref="%{Referer}i" ua="%{User-Agent}i" ct="%{Content-Type}i"
+    te="%{Transfer-Encoding}i" cl="%{Content-Length}i" sc="%{Set-Cookie}o"
+
+  The quoted-string fragment "(?:[^"\\]|\\.)*" accepts the backslash-escaped
+  quotes that Apache writes inside logged header values.
+-->
+
+<decoder name="php2shell-accesslog">
+  <prematch type="pcre2">^php2shell ip=\S+ ts="[^"]*" req="(?:[^"\\]|\\.)*" status=\d{3} </prematch>
+</decoder>
+
+<decoder name="php2shell-accesslog-fields">
+  <parent>php2shell-accesslog</parent>
+  <regex type="pcre2">^php2shell ip=(\S+) ts="[^"]*" req="(\S+) (\S+) (?:[^"\\]|\\.)*" status=(\d{3}) bytes=\S+ ref="(?:[^"\\]|\\.)*" ua="(?:[^"\\]|\\.)*" ct="((?:[^"\\]|\\.)*)" te="((?:[^"\\]|\\.)*)" cl="((?:[^"\\]|\\.)*)" sc="(.*)"$</regex>
+  <order>srcip,protocol,url,id,content_type,transfer_encoding,content_length,set_cookie</order>
+</decoder>
