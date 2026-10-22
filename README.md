@@ -379,8 +379,26 @@ Fixed upstream in PHP 8.5.12, 8.4.27, 8.3.36 and 8.2.35, with source backports f
 
 ## Author
 
-**Kislley Rodrigues (m0us3r)**
-Wazuh Ambassador | Detection Engineering | Blue Team
+**Kislley Rodrigues** (m0us3r) - Wazuh Ambassador | Detection Engineering | Blue Team
+
+## Wazuh
+
+This project was developed as part of the [Wazuh Ambassador Program](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
+
+Wazuh is a free, open source security platform that provides unified XDR and SIEM capabilities. Learn more at [wazuh.com](https://wazuh.com/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
+
+## Validation environment
+
+The rules, decoder and SCA policy were validated in a lab with the following versions:
+
+- Wazuh manager: 4.14.8
+- Agent OS: Ubuntu 24.04.5 LTS
+- Web server: Apache 2.4.58 (prefork, mod_php)
+- PHP: 8.3.6 (package 8.3.6-0ubuntu0.24.04.13 is the patched build)
+
+## Acknowledgments
+
+Special thanks to Katia Bukcovak and Farouk Musa from the Wazuh team for their support of the Ambassador Program and for the technical review of this work.
 
 ---
 
