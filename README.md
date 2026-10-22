@@ -57,10 +57,10 @@ The rules detect the observable pre-conditions and symptoms described in the off
 ## What Changed in v1.1
 
 - **CVE attribution.** Rule 100131 and the README now follow the titles in the PHP advisory and name both CVEs.
-- **No cookies in alerts.** Rules 100130 and 100131 use `no_full_log`, and the decoder no longer extracts the `Set-Cookie` header into a field. Rule 100131 matches the raw log line inside the analysis engine, so the cookie values are never stored in the alert.
+- **No cookies in alerts.** Rules 100130 and 100131 use `no_full_log`, and the decoder no longer extracts the `Set-Cookie` header into a field. Rule 100131 matches the raw log line inside the analysis engine, so the cookie values are never stored in the alert. A sibling decoder stores only the first 8 characters of a `PHPSESSID` cookie in `data.phpsessid_prefix`, enough to see the shape of an anomalous value.
 - **`same_srcip`.** Rules 100101 and 100120 use `same_srcip`.
-- **SCA effective values.** Checks 109601 to 109603 pass when the installed package carries the vendor backport, or when the interim mitigation is effective. The effective value is the last assignment across `php.ini` and `conf.d/*.ini`, which is the order PHP loads them. A patched host is no longer penalized for interim mitigations it does not need.
-- **SCA check 109604.** New check that searches the Apache configuration for `php_value` and `php_admin_value` lines that override the mitigated directives.
+- **SCA effective values.** Checks 109601 to 109603 pass when the installed package carries the vendor backport, or when the interim mitigation is effective. The effective value is computed by the PHP CLI started with the Apache `php.ini` and the Apache `conf.d` scan directory, and read with `ini_get()`, so every drop-in is applied in the order PHP loads them. A patched host is no longer penalized for interim mitigations it does not need.
+- **SCA check 109604.** New check that searches `/etc/apache2` and the `.htaccess` files under `/var/www` for `php_value`, `php_admin_value`, `php_flag` and `php_admin_flag` lines that undo a mitigation. Commented lines are ignored, and `php_admin_value memory_limit -1`, the setting the advisory recommends, is not flagged.
 
 ---
 
@@ -92,7 +92,7 @@ PHP2Shell-Detection-with-Wazuh/
 │   └── php2shell_rules.xml                  # 6 Wazuh rules (100100-100131)
 │
 ├── decoders/
-│   └── php2shell_decoders.xml               # decoder pair for the php2shell access log
+│   └── php2shell_decoders.xml               # parent decoder and two sibling field decoders for the php2shell access log
 │
 ├── apache/
 │   └── php2shell-logformat.conf             # LogFormat and CustomLog for Apache 2.4
@@ -104,13 +104,14 @@ PHP2Shell-Detection-with-Wazuh/
     ├── exploit_chain_timeline.svg           # Exploit chain diagram (self-contained SVG)
     ├── rule_100130_v11.png                  # Rule 100130, v1.1 alert (no full_log, no set_cookie)
     ├── rule_100131_v11.png                  # Rule 100131, v1.1 alert (no full_log, no set_cookie)
+    ├── rule_100131-rev2.png                 # Rule 100131 with data.phpsessid_prefix (sibling decoder)
     ├── rules_100101_100120_v11.png          # Rules 100101 and 100120 with same_srcip
     ├── rules_100100_100101.png              # Rules 100100 and 100101, OOM fatals
     ├── sca_policy.png                       # SCA v1.0, unpatched endpoint (25%)
     ├── sca_policy_pos_up.png                # SCA v1.0, patched endpoint (50%)
-    ├── sca_policy_score100.png              # SCA v1.1, patched endpoint (100%)
-    ├── sca_policy_score80.png               # SCA v1.1, mitigation through conf.d (80%)
-    ├── sca_policy_score20.png               # SCA v1.1, conf.d revert and Apache override (20%)
+    ├── sca_policy_revision.png              # SCA v1.1 final commands, patched endpoint (100%)
+    ├── sca_policy_revision-2_score80.png    # SCA v1.1 final commands, mitigations through conf.d (80%)
+    ├── sca_policy_revision-2_score20.png    # SCA v1.1 final commands, no mitigation and Apache override (20%)
     └── sca_events.png                       # SCA events indexed in Discover (v1.0)
 ```
 
@@ -139,7 +140,7 @@ PHP2Shell-Detection-with-Wazuh/
 
 ### Decoder
 
-The `php2shell-accesslog` decoder and its child extract `srcip`, `protocol` (method), `url`, `id` (status), `content_type`, `transfer_encoding` and `content_length` from the custom access log line. The `Set-Cookie` header is intentionally not extracted.
+The `php2shell-accesslog` decoder and its child extract `srcip`, `protocol` (method), `url`, `id` (status), `content_type`, `transfer_encoding` and `content_length` from the custom access log line. The `Set-Cookie` header is intentionally not extracted. A sibling decoder, which Wazuh evaluates in parallel because it has the same name and parent, stores only the first 8 characters of a `PHPSESSID` response cookie in `phpsessid_prefix`. The two child decoders must stay adjacent and keep the same name.
 
 ---
 
@@ -217,7 +218,7 @@ Register it inside the `<sca>` block of the endpoint `ossec.conf` and restart th
 systemctl restart wazuh-agent
 ```
 
-The policy was tested configured in the agent's local `ossec.conf`, where `sca.remote_commands` is not required for the command rules (`c:`) it uses. Delivery through centralized configuration (`agent.conf`) was not tested.
+Checks 109601 to 109603 run the PHP CLI binary `php8.3` with the Apache `php.ini` and `conf.d`, so the `php8.3-cli` package must be installed on the endpoint. The policy was tested configured in the agent's local `ossec.conf`, where `sca.remote_commands` is not required for the command rules (`c:`) it uses. Delivery through centralized configuration (`agent.conf`) was not tested.
 
 ---
 
@@ -226,7 +227,7 @@ The policy was tested configured in the agent's local `ossec.conf`, where `sca.r
 ### Decoder and rules by logtest (manager)
 
 ```bash
-cat <<'EOF' | /var/ossec/bin/wazuh-logtest 2>&1 | grep -E '^\s+(name|srcip|url|transfer_encoding|id|level):|Alert to be generated|full event'
+cat <<'EOF' | /var/ossec/bin/wazuh-logtest 2>&1 | grep -E '^\s+(name|srcip|url|transfer_encoding|id|level|phpsessid_prefix):|Alert to be generated|full event'
 php2shell ip=127.0.0.1 ts="2026-10-22T11:45:00-0300" req="POST / HTTP/1.1" status=200 bytes=531 ref="-" ua="curl/8.5.0" ct="multipart/form-data; boundary=------------------------abc" te="chunked" cl="-" sc="-"
 php2shell ip=127.0.0.1 ts="2026-10-22T11:45:00-0300" req="GET /cookie_test.php HTTP/1.1" status=200 bytes=531 ref="-" ua="curl/8.5.0" ct="-" te="-" cl="-" sc="PHPSESSID=a%00b%FF%41%7F%7F; path=/"
 php2shell ip=10.0.0.9 ts="2026-10-22T11:45:00-0300" req="GET /x.php HTTP/1.1" status=200 bytes=531 ref="-" ua="curl/8.5.0" ct="-" te="-" cl="-" sc="PHPSESSID=abcdefghijklmnopqrstuvwxyz012345; path=/"
@@ -234,7 +235,7 @@ php2shell ip=10.0.0.9 ts="2026-10-22T11:45:00-0300" req="GET /y.php HTTP/1.1" st
 EOF
 ```
 
-Observed result: line 1 fires 100130 (level 7) and line 2 fires 100131 (level 10). Line 3, a normal 32-character session ID, and line 4, a `%XX` value in a different cookie with a normal `PHPSESSID`, fire nothing. No decoded field holds the cookie.
+Observed result: line 1 fires 100130 (level 7) and line 2 fires 100131 (level 10) with `phpsessid_prefix: 'a%00b%FF'`. Line 3, a normal 32-character session ID, and line 4, a `%XX` value in a different cookie with a normal `PHPSESSID`, fire nothing. No decoded field holds a full cookie.
 
 ### Real events on the lab endpoint
 
@@ -282,6 +283,10 @@ Each screenshot lists the v1.1 alert in the top row (15:23:52) and the v1.0 aler
 
 ![Rule 100131 in v1.1](docs/rule_100131_v11.png)
 
+After the sibling decoder was added, a new `cookie_test.php` request produced the top row below (17:18:13). `data.phpsessid_prefix` holds the 8 character prefix `a%00b%FF`, while `full_log` and `data.set_cookie` stay empty. The two older rows are the v1.1 alert before the prefix field (15:23:52) and the v1.0 alert with the raw cookie (12:09:16).
+
+![Rule 100131 with phpsessid_prefix](docs/rule_100131-rev2.png)
+
 ### Rules 100101 and 100120 with `same_srcip`
 
 The v1.1 alerts (15:23:58 and 15:24:00) fire on the same OOM and HTTP 500 sequence as the v1.0 alerts of the earlier runs (11:24 and 12:10).
@@ -310,21 +315,23 @@ The SCA results reach the indexer as events:
 
 ### SCA policy v1.1 - patched endpoint
 
-With the backport installed, all five checks pass and the score is 100%.
+With the backport installed, all five checks pass and the score is 100%. Scan end time 17:04:35. The dashboard lists only the package command as target, because the `any` condition stops at the first passing rule.
 
-![SCA v1.1 patched](docs/sca_policy_score100.png)
+![SCA v1.1 patched](docs/sca_policy_revision.png)
 
-### SCA policy v1.1 - effective value logic
+### SCA policy v1.1 - effective value computed with ini_get
 
-To test the effective value logic on a host that carries the backport, the package comparison in the policy was temporarily raised so that check 109600 fails, simulating a host without the backport. Test files were removed and the policy was restored afterwards.
+To test the mitigation commands on a host that carries the backport, the package comparison in the policy was temporarily raised from `>= 13` to `>= 99` so that check 109600 fails, simulating a host without the backport. The test files were removed and the policy was restored afterwards (SHA-256 verified).
 
-A drop-in `conf.d/99-php2shell-test.ini` with `memory_limit = -1` and `session.upload_progress.enabled = Off` makes checks 109601 and 109602 pass without touching `php.ini`. Only 109600 fails and the score is 80%.
+A drop-in `/etc/php/8.3/apache2/conf.d/99-php2shell-test.ini` with `memory_limit = -1`, `post_max_size = 32M` and `session.upload_progress.enabled = Off` was created. Run with the Apache `php.ini` and `conf.d`, `ini_get()` returned `-1`, `0` and `32`. Checks 109601 to 109604 pass through the PHP CLI commands and only 109600 fails. The score is 80% (scan end 17:10:07).
 
-![SCA v1.1 mitigation through conf.d](docs/sca_policy_score80.png)
+![SCA v1.1 mitigation through conf.d](docs/sca_policy_revision-2_score80.png)
 
-A second drop-in loaded after the first one reverts both directives (`memory_limit = 256M`, `session.upload_progress.enabled = On`), and a `php_admin_value memory_limit 256M` line was added to a file under `/etc/apache2`. Checks 109601 and 109602 fail because the last assignment wins, and check 109604 fails because of the Apache override. The score is 20%.
+The drop-in was removed, so the directives return to `128M`, `8M` and upload progress enabled, and the line `php_value memory_limit 128M` was written to `/etc/apache2/conf-enabled/zz-php2shell-test.conf`. Checks 109601 and 109602 fail because `ini_get()` returns the unmitigated values, and check 109604 fails because of the Apache override. Check 109603 passes because the default `post_max_size` of 8M is within the 32M limit. The score is 20% (scan end 17:14:09).
 
-![SCA v1.1 revert and Apache override](docs/sca_policy_score20.png)
+![SCA v1.1 no mitigation and Apache override](docs/sca_policy_revision-2_score20.png)
+
+The shell logic of the five checks was also exercised outside Wazuh against 35 configurations with PHP 8.3.6: `conf.d` ordering, units (K, M, G and bytes), `0` and `-1` values, quoted values, `On`, `Off`, `0`, `No` and `false` for the boolean, overrides through symlinked Apache sites, `.htaccess` files, commented lines and upper case directive names.
 
 ---
 
@@ -338,20 +345,20 @@ Scope: Ubuntu 24.04 LTS, PHP 8.3, Apache 2 with mod_php. The policy only runs wh
 | 109601 | `session.upload_progress.enabled` is disabled | The package has the backport, or the effective value is `Off` or `0` |
 | 109602 | `memory_limit` is `-1` | The package has the backport, or the effective value is `-1` |
 | 109603 | `post_max_size` is 32M or lower | The package has the backport, or the effective value is 32M or lower |
-| 109604 | No Apache `php_value` or `php_admin_value` overrides the mitigated directives | The package has the backport, or no such line exists under `/etc/apache2` |
+| 109604 | No Apache or `.htaccess` override undoes the mitigation | The package has the backport, or no `php_value`, `php_admin_value`, `php_flag` or `php_admin_flag` line under `/etc/apache2` or in `.htaccess` files under `/var/www` sets `memory_limit` to anything but `-1`, `post_max_size` above 32M or unlimited, or `session.upload_progress.enabled` on |
 
-The effective value of a directive is its last assignment across `/etc/php/8.3/apache2/php.ini` and `/etc/php/8.3/apache2/conf.d/*.ini`. Checks 109601 to 109604 use the condition `any`, so a host with the backport passes them. They are partial mitigations from the PHP advisory. Updating PHP is the only complete fix, and `memory_limit=-1` increases exhaustion risk, so pair it with a container or cgroup memory limit.
+The effective value of a directive is what `ini_get()` returns when the PHP CLI is started with `-c /etc/php/8.3/apache2/php.ini` and `PHP_INI_SCAN_DIR=/etc/php/8.3/apache2/conf.d`. `post_max_size` is converted to MiB and rounded up, and `0` (unlimited) fails. Checks 109601 to 109604 use the condition `any`, so a host with the backport passes them. They are partial mitigations from the PHP advisory. Updating PHP is the only complete fix, and `memory_limit=-1` increases exhaustion risk, so pair it with a container or cgroup memory limit.
 
 ---
 
 ## Limitations
 
-- **Session cookies in the log file.** The `php2shell` LogFormat records the full `Set-Cookie` response header, which includes every cookie the application sets in a response. Since v1.1 the decoder does not extract it and rules 100130 and 100131 omit `full_log`, so alerts carry no cookies. The log file `php2shell_access.log` and, if `logall_json` is enabled, the Wazuh archives still contain the raw line. Treat both as sensitive: restrict the log file to `root:adm` with mode 640, keep retention short, restrict access to the archives, and enable the format only on hosts under review.
+- **Session cookies in the log file.** The `php2shell` LogFormat records the full `Set-Cookie` response header, which includes every cookie the application sets in a response. Since v1.1 the decoder does not extract it, rules 100130 and 100131 omit `full_log`, and only a truncated 8 character `PHPSESSID` prefix reaches the alert, so alerts carry no cookies. Leaked memory can hold passwords, tokens and API keys (Wiz), so also restrict who can read rule 100131 alerts. The log file `php2shell_access.log` and, if `logall_json` is enabled, the Wazuh archives still contain the raw line. Treat both as sensitive: restrict the log file to `root:adm` with mode 640, keep retention short, restrict access to the archives, and enable the format only on hosts under review.
 - **Rule 100110 is validated by logtest only.** Crashing a production-like worker on purpose is invasive, so no real segfault event was generated. Segfaults also have benign causes, such as defective extensions, and the rule carries no source IP because Apache logs worker exits without a client address.
 - **Rule 100120 can be noisy** on sites with legitimate bursts of HTTP 500. Tune the level and frequency to your baseline.
 - **Chunked detection is HTTP/1.1 only.** HTTP/2 lengthless multipart requests, also described by Calif, carry no `Transfer-Encoding` header and are not covered by rule 100130.
 - **PHP-FPM was not tested.** The lab runs mod_php. The rules operate on Apache logs, but exploitation paths differ on PHP-FPM, as described by the researchers. The policy reads the Apache SAPI configuration only and does not cover FPM pool settings.
-- **SCA effective values are file based.** The policy reads `php.ini` and `conf.d/*.ini` of the Apache SAPI and searches `/etc/apache2` for `php_value` and `php_admin_value`. It does not read `.htaccess` files, configuration included from outside `/etc/apache2`, or values set by the application at runtime.
+- **SCA effective values come from the files of the Apache SAPI.** `ini_get()` reflects `php.ini` and `conf.d` and needs the `php8.3-cli` package. Check 109604 searches `/etc/apache2` and `.htaccess` files under `/var/www`. It does not read `.htaccess` files elsewhere, configuration included from outside `/etc/apache2`, `[PATH=]` and `[HOST=]` sections, or values set by the application at runtime. `post_max_size` overrides are matched for values in M, G or 9 or more digits of bytes.
 - **The SCA policy is specific to Ubuntu 24.04 with PHP 8.3 and Apache mod_php.** Other distributions and PHP branches need their own revision checks.
 
 ---
