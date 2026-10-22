@@ -1,0 +1,72 @@
+# Security Configuration Assessment
+# PHP2Shell - CVE-2026-109618 / CVE-2026-109619
+# Scope: Ubuntu 24.04 LTS, PHP 8.3, Apache 2 with mod_php
+# Author: Kislley Rodrigues - Wazuh Ambassador
+#
+# References:
+#   https://www.php.net/archive/2026.php#2026-10-21-5
+#   https://www.wiz.io/blog/php2shell-php-rce
+#   https://calif.io/php2shell/
+
+policy:
+  id: "php2shell_ubuntu2404_php83"
+  file: "php2shell_cve_2026_109618_109619.yml"
+  name: "PHP2Shell (CVE-2026-109618 / CVE-2026-109619) exposure - Ubuntu 24.04 PHP 8.3 Apache mod_php"
+  description: "Checks whether the Ubuntu PHP 8.3 package includes the vendor backport for CVE-2026-109618 and CVE-2026-109619, and whether the interim mitigations listed in the official PHP security advisory are applied to the Apache mod_php configuration."
+  references:
+    - https://www.php.net/archive/2026.php#2026-10-21-5
+    - https://www.wiz.io/blog/php2shell-php-rce
+    - https://calif.io/php2shell/
+
+requirements:
+  title: "Ubuntu PHP 8.3 package and Apache mod_php configuration are present"
+  description: "The policy only runs on endpoints with the Ubuntu php8.3-common package and the Apache 2 PHP 8.3 php.ini file."
+  condition: all
+  rules:
+    - 'f:/etc/php/8.3/apache2/php.ini'
+    - 'c:dpkg-query -W php8.3-common -> r:^php8.3-common'
+
+checks:
+  - id: 109600
+    title: "PHP 8.3 package includes the CVE-2026-109618 / CVE-2026-109619 backport (8.3.6-0ubuntu0.24.04.13 or later)"
+    description: "Ubuntu ships the fix as a backport in package version 8.3.6-0ubuntu0.24.04.13. The upstream version string remains 8.3.6, so php -v cannot be used to determine exposure."
+    rationale: "Unpatched PHP builds allow unauthenticated remote code execution and process memory disclosure through out-of-memory and stale global state conditions in the PHP engine."
+    remediation: "Run: apt update && apt install --only-upgrade php8.3-common libapache2-mod-php8.3 php8.3-cli php8.3-opcache php8.3-readline && systemctl restart apache2"
+    references:
+      - https://www.php.net/archive/2026.php#2026-10-21-5
+    condition: all
+    rules:
+      - 'c:dpkg-query -W php8.3-common -> n:24.04.(\d+)$ compare >= 13'
+
+  - id: 109601
+    title: "Interim mitigation: session.upload_progress.enabled is disabled for Apache mod_php"
+    description: "The official PHP advisory lists session.upload_progress.enabled=0 as an interim measure for CVE-2026-109619. The PHP default is enabled."
+    rationale: "Session upload progress handling runs during request startup, before application code, and is part of the confirmed exploitation paths."
+    remediation: "In /etc/php/8.3/apache2/php.ini set session.upload_progress.enabled = Off and restart Apache. Do not rely on ini_set() or .user.ini. This is a partial mitigation; updating PHP is the only complete fix."
+    references:
+      - https://www.php.net/archive/2026.php#2026-10-21-5
+    condition: all
+    rules:
+      - 'f:/etc/php/8.3/apache2/php.ini -> r:^\s*session.upload_progress.enabled\s*=\s*Off|^\s*session.upload_progress.enabled\s*=\s*0'
+
+  - id: 109602
+    title: "Interim mitigation: memory_limit is set to -1 for Apache mod_php"
+    description: "The official PHP advisory lists memory_limit=-1 as an interim measure for CVE-2026-109618, removing the controllable PHP memory limit failure."
+    rationale: "The exploitation chain relies on triggering a fatal memory_limit error at a chosen allocation."
+    remediation: "In /etc/php/8.3/apache2/php.ini set memory_limit = -1 and enforce a container or cgroup memory limit as the availability boundary. This increases memory exhaustion risk and is a partial mitigation only; updating PHP is the only complete fix."
+    references:
+      - https://www.php.net/archive/2026.php#2026-10-21-5
+    condition: all
+    rules:
+      - 'f:/etc/php/8.3/apache2/php.ini -> r:^\s*memory_limit\s*=\s*-1'
+
+  - id: 109603
+    title: "Interim mitigation: post_max_size is 32M or lower for Apache mod_php"
+    description: "The official PHP advisory recommends post_max_size = 8M for applications without uploads and 32M when uploads are required."
+    rationale: "A low post_max_size reduces the request size available to build memory pressure. The researchers documented bypasses using chunked or lengthless requests, so request limits must also be enforced at the web server or proxy."
+    remediation: "In /etc/php/8.3/apache2/php.ini set post_max_size = 8M (or 32M if uploads are required), keep upload_max_filesize below post_max_size and restart Apache."
+    references:
+      - https://www.php.net/archive/2026.php#2026-10-21-5
+    condition: all
+    rules:
+      - 'f:/etc/php/8.3/apache2/php.ini -> n:^\s*post_max_size\s*=\s*(\d+)M compare <= 32'
