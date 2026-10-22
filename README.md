@@ -72,7 +72,9 @@ Step 6: RCE                     unauthenticated code execution (WordPress, Drupa
 ## Repository Structure
 
 ```
-PHP2Shell-Detection-with-Wazuh-4.14.8/
+PHP2Shell-Detection-with-Wazuh/
+│
+├── SECURITY.md                              # Vulnerability reporting policy
 │
 ├── rules/
 │   └── php2shell_rules.xml                  # 6 Wazuh rules (100100-100131)
