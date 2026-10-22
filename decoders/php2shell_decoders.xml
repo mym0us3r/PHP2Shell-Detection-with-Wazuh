@@ -22,6 +22,6 @@
 
 <decoder name="php2shell-accesslog-fields">
   <parent>php2shell-accesslog</parent>
-  <regex type="pcre2">^php2shell ip=(\S+) ts="[^"]*" req="(\S+) (\S+) (?:[^"\\]|\\.)*" status=(\d{3}) bytes=\S+ ref="(?:[^"\\]|\\.)*" ua="(?:[^"\\]|\\.)*" ct="((?:[^"\\]|\\.)*)" te="((?:[^"\\]|\\.)*)" cl="((?:[^"\\]|\\.)*)" sc="(.*)"$</regex>
-  <order>srcip,protocol,url,id,content_type,transfer_encoding,content_length,set_cookie</order>
+  <regex type="pcre2">^php2shell ip=(\S+) ts="[^"]*" req="(\S+) (\S+) (?:[^"\\]|\\.)*" status=(\d{3}) bytes=\S+ ref="(?:[^"\\]|\\.)*" ua="(?:[^"\\]|\\.)*" ct="((?:[^"\\]|\\.)*)" te="((?:[^"\\]|\\.)*)" cl="((?:[^"\\]|\\.)*)" sc=".*"$</regex>
+  <order>srcip,protocol,url,id,content_type,transfer_encoding,content_length</order>
 </decoder>
