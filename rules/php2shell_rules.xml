@@ -1,0 +1,111 @@
+<!--
+  Local rules for PHP2Shell - CVE-2026-109618 / CVE-2026-109619
+  Scope: Apache mod_php on Linux. Defensive detection of exploitation
+  pre-conditions and worker instability described in the official sources.
+
+  Author: Kislley Rodrigues - Wazuh Ambassador
+
+  References:
+    https://www.php.net/archive/2026.php#2026-10-21-5
+    https://www.wiz.io/blog/php2shell-php-rce
+    https://calif.io/php2shell/
+
+  Design notes:
+    - Native rule 31420 (PHP Fatal error) inherits from 31402/31405, which
+      do not match the Apache 2.4 error log format. In wazuh-logtest 4.14.8
+      that format stops at rule 30301 (Apache: Error messages grouped), so
+      rule 100100 inherits from 30301 directly.
+    - Native rules 30104 / 30304 decode Apache child "exit signal
+      Segmentation Fault" at level 12.
+    - These rules add the memory_limit OOM fatal as a named pre-condition
+      and correlate repetition by source IP, which is the observable
+      signal called out by the advisory and the researchers. They do not
+      claim that a single event proves exploitation.
+
+  Custom rule block: 100100 - 100199
+-->
+
+<group name="php2shell,web,attack,">
+
+  <!-- Single OOM fatal: the memory_limit exhaustion the attack relies on -->
+  <rule id="100100" level="6">
+    <if_sid>30301</if_sid>
+    <regex>PHP Fatal error:\s+Allowed memory size of </regex>
+    <description>PHP memory_limit exhausted (OOM fatal). PHP2Shell (CVE-2026-109618/109619) relies on this condition to interrupt the engine.</description>
+    <mitre>
+      <id>T1190</id>
+      <id>T1499.003</id>
+    </mitre>
+    <group>pci_dss_6.5,pci_dss_10.6.1,nist_800_53_SI.4,nist_800_53_SA.11,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+  <!-- Repetition of the OOM fatal from one source: memory-pressure attempt -->
+  <rule id="100101" level="10" frequency="6" timeframe="120">
+    <if_matched_sid>100100</if_matched_sid>
+    <same_source_ip />
+    <description>Repeated PHP OOM fatals from the same source IP. Consistent with the memory-pressure stage of a PHP2Shell (CVE-2026-109618/109619) attempt.</description>
+    <mitre>
+      <id>T1190</id>
+      <id>T1499.003</id>
+    </mitre>
+    <group>pci_dss_6.5,pci_dss_11.4,nist_800_53_SI.4,tsc_CC6.1,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+  <!-- Repeated Apache 2.4 worker segfaults: the worker churn signal.
+       Native rule 30304 is the Apache 2.4 log format (e.g. [core:notice]). -->
+  <rule id="100110" level="13" frequency="4" timeframe="120">
+    <if_matched_sid>30304</if_matched_sid>
+    <description>Repeated Apache worker segmentation faults in a short window. Consistent with the worker churn signal described for PHP2Shell (CVE-2026-109618/109619).</description>
+    <mitre>
+      <id>T1190</id>
+      <id>T1499.004</id>
+    </mitre>
+    <group>service_availability,pci_dss_6.5.2,pci_dss_6.6,nist_800_53_SC.5,nist_800_53_SI.3,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+  <!-- Repeated HTTP 500 from one source IP: the "repeated HTTP 500 responses"
+       signal. In wazuh-logtest 4.14.8 an Apache access log line with status
+       500 ends at native rule 31122 (child of 31120), so if_matched_sid must
+       reference 31122, not 31120. Requires the access log to be collected. -->
+  <rule id="100120" level="8" frequency="5" timeframe="60">
+    <if_matched_sid>31122</if_matched_sid>
+    <same_source_ip />
+    <description>Repeated HTTP 500 responses from the same source IP. Consistent with the repeated 500 responses reported for PHP2Shell (CVE-2026-109618/109619) exploitation attempts.</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>pci_dss_6.5,pci_dss_11.4,nist_800_53_SI.4,tsc_CC6.1,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+  <!-- Rules below need the php2shell Apache LogFormat and the decoders in
+       php2shell_decoders.xml. -->
+
+  <!-- Multipart request with chunked Transfer-Encoding: the researchers
+       documented that PHP compares post_max_size with the declared
+       Content-Length only, so chunked multipart bodies bypass it. -->
+  <rule id="100130" level="7">
+    <decoded_as>php2shell-accesslog</decoded_as>
+    <field name="transfer_encoding" type="pcre2">(?i)chunked</field>
+    <field name="content_type" type="pcre2">(?i)multipart/form-data</field>
+    <description>Multipart request with chunked Transfer-Encoding. Bypasses the post_max_size check described for PHP2Shell (CVE-2026-109618/109619); legitimate clients rarely send chunked multipart bodies.</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>pci_dss_6.5,pci_dss_11.4,nist_800_53_SI.4,tsc_CC6.1,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+  <!-- PHPSESSID response cookie with percent-encoded bytes or an oversized
+       value: the memory disclosure URL-encodes reclaimed heap contents into
+       a PHPSESSID response cookie. A legitimate session ID has no %XX. -->
+  <rule id="100131" level="10">
+    <decoded_as>php2shell-accesslog</decoded_as>
+    <field name="set_cookie" type="pcre2">PHPSESSID=(?:[^;\s]*%[0-9A-Fa-f]{2}|[^;\s%]{64,})</field>
+    <description>PHPSESSID response cookie with percent-encoded bytes or an oversized value. Consistent with the PHP worker memory disclosure described for PHP2Shell (CVE-2026-109618).</description>
+    <mitre>
+      <id>T1190</id>
+      <id>T1005</id>
+    </mitre>
+    <group>pci_dss_6.5,pci_dss_11.4,nist_800_53_SI.4,tsc_CC6.1,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+</group>
