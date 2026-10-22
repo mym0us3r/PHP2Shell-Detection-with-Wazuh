@@ -20,14 +20,14 @@ Please report any of the following:
 - A bypass or false negative in a rule, for example a request that triggers the PHP2Shell conditions but evades rules 100100 to 100131.
 - A regular expression in the decoders or rules that can be abused for excessive CPU use (ReDoS) or log injection against the Wazuh manager.
 - A rule or decoder that can be abused to suppress other alerts or to flood the manager with events.
-- Instructions in this repository that create a security risk. One known case is documented in the README: the `php2shell` LogFormat records the full `Set-Cookie` response header, so the log file must be treated as sensitive.
+- Instructions in this repository that create a security risk. One known case is documented in the README: the `php2shell` LogFormat records the full `Set-Cookie` response header, so the log file and, when `logall_json` is enabled, the Wazuh archives must be treated as sensitive. Alerts from rules 100130 and 100131 carry no cookies since v1.1.
 - Sensitive data committed by mistake, such as keys, tokens or internal hostnames.
 
 Out of scope:
 
 - Vulnerabilities in PHP itself. Report them to the PHP project through its official security channels.
 - Vulnerabilities in Wazuh itself. Report them to Wazuh through its official disclosure process.
-- Detection gaps already listed in the Limitations section of the README (HTTP/2 lengthless bodies, PHP-FPM, rule 100110 validated by logtest only).
+- Detection gaps already listed in the Limitations section of the README (HTTP/2 lengthless bodies, PHP-FPM, rule 100110 validated by logtest only, SCA effective values that are file based and do not read `.htaccess`).
 
 ## How to Report
 
