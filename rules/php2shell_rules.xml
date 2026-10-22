@@ -42,7 +42,7 @@
   <!-- Repetition of the OOM fatal from one source: memory-pressure attempt -->
   <rule id="100101" level="10" frequency="6" timeframe="120">
     <if_matched_sid>100100</if_matched_sid>
-    <same_source_ip />
+    <same_srcip />
     <description>Repeated PHP OOM fatals from the same source IP. Consistent with the memory-pressure stage of a PHP2Shell (CVE-2026-109618/109619) attempt.</description>
     <mitre>
       <id>T1190</id>
@@ -69,7 +69,7 @@
        reference 31122, not 31120. Requires the access log to be collected. -->
   <rule id="100120" level="8" frequency="5" timeframe="60">
     <if_matched_sid>31122</if_matched_sid>
-    <same_source_ip />
+    <same_srcip />
     <description>Repeated HTTP 500 responses from the same source IP. Consistent with the repeated 500 responses reported for PHP2Shell (CVE-2026-109618/109619) exploitation attempts.</description>
     <mitre>
       <id>T1190</id>
@@ -87,6 +87,7 @@
     <decoded_as>php2shell-accesslog</decoded_as>
     <field name="transfer_encoding" type="pcre2">(?i)chunked</field>
     <field name="content_type" type="pcre2">(?i)multipart/form-data</field>
+    <options>no_full_log</options>
     <description>Multipart request with chunked Transfer-Encoding. Bypasses the post_max_size check described for PHP2Shell (CVE-2026-109618/109619); legitimate clients rarely send chunked multipart bodies.</description>
     <mitre>
       <id>T1190</id>
@@ -96,11 +97,14 @@
 
   <!-- PHPSESSID response cookie with percent-encoded bytes or an oversized
        value: the memory disclosure URL-encodes reclaimed heap contents into
-       a PHPSESSID response cookie. A legitimate session ID has no %XX. -->
+       a PHPSESSID response cookie. A legitimate session ID has no %XX.
+       The rule matches the raw log line and no_full_log keeps the cookies
+       out of the alert. -->
   <rule id="100131" level="10">
     <decoded_as>php2shell-accesslog</decoded_as>
-    <field name="set_cookie" type="pcre2">PHPSESSID=(?:[^;\s]*%[0-9A-Fa-f]{2}|[^;\s%]{64,})</field>
-    <description>PHPSESSID response cookie with percent-encoded bytes or an oversized value. Consistent with the PHP worker memory disclosure described for PHP2Shell (CVE-2026-109618).</description>
+    <regex type="pcre2">(?:sc="|, )PHPSESSID=(?:[^;,\s"]*?%[0-9A-Fa-f]{2}|[^;,\s%"]{64,})</regex>
+    <options>no_full_log</options>
+    <description>PHPSESSID response cookie with percent-encoded bytes or an oversized value. Consistent with the PHP worker memory disclosure described for PHP2Shell (CVE-2026-109618 and CVE-2026-109619).</description>
     <mitre>
       <id>T1190</id>
       <id>T1005</id>
