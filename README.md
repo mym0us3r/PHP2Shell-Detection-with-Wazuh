@@ -75,7 +75,7 @@ Step 5: next multipart request  freed heap is URL-encoded into the PHPSESSID coo
 Step 6: RCE                     unauthenticated code execution (WordPress, Drupal, Joomla)
 ```
 
-![PHP2Shell exploit chain](docs/exploit_chain_timeline.svg)
+![PHP2Shell exploit chain](docs/exploit_chain_timeline.png)
 
 `post_max_size` is compared with the declared `Content-Length`, not with the bytes actually read, so chunked HTTP/1.1 and lengthless HTTP/2 multipart requests bypass it. On mod_php the request cleanup still runs after a startup fatal, which is why mod_php carries the highest risk. On PHP-FPM a startup failure exits the worker, and exploitation needs a post-startup decoding operation.
 
