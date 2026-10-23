@@ -2,7 +2,7 @@
 
 > **Detection engineering for the PHP2Shell memory-safety flaws · Apache mod_php on Linux · lab-validated on Ubuntu 24.04 LTS**
 
-Wazuh 4.14.8 | 6 rules | 1 decoder pair | SCA policy with 5 checks | MITRE T1190, T1499, T1005 | CVSS v4 9.2
+Wazuh 4.14.8 | 6 rules | 3 decoders | SCA policy with 5 checks | MITRE T1190, T1499, T1005 | CVSS v4 9.2
 
 ---
 
@@ -30,6 +30,7 @@ Because the exploit runs below the application layer, application logs show litt
 | Resource | Link |
 |---|---|
 | PHP security advisory (2026-10-21) | https://www.php.net/archive/2026.php#2026-10-21-5 |
+| PHP pre-announcement with the CVSS score (2026-10-20) | https://www.php.net/archive/2026.php#2026-10-20-1 |
 | Wiz Research write-up | https://www.wiz.io/blog/php2shell-php-rce |
 | Calif technical write-up | https://calif.io/php2shell/ |
 | Wazuh rules syntax | https://documentation.wazuh.com/current/user-manual/ruleset/ruleset-xml-syntax/rules.html |
@@ -101,7 +102,7 @@ PHP2Shell-Detection-with-Wazuh/
 │   └── php2shell_cve_2026_109618_109619.yml # SCA policy - Ubuntu 24.04, PHP 8.3, mod_php
 │
 └── docs/
-    ├── exploit_chain_timeline.svg           # Exploit chain diagram (self-contained SVG)
+    ├── exploit_chain_timeline.png           # Exploit chain diagram
     ├── rule_100130_v11.png                  # Rule 100130, v1.1 alert (no full_log, no set_cookie)
     ├── rule_100131_v11.png                  # Rule 100131, v1.1 alert (no full_log, no set_cookie)
     ├── rule_100131-rev2.png                 # Rule 100131 with data.phpsessid_prefix (sibling decoder)
@@ -399,14 +400,3 @@ The rules, decoder and SCA policy were validated in a lab with the following ver
 ## Acknowledgments
 
 Special thanks to Katia Bukcovac and Farouk Musa from the Wazuh team for their support of the Ambassador Program and for the technical review of this work.
-
----
-
-## Wazuh
-
-This project was developed as part of the [Wazuh Ambassador Program](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
-
-Wazuh is a free, open source security platform that provides unified XDR and SIEM protection.
-Learn more at [wazuh.com](https://wazuh.com/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
-
-*Rules, decoder and SCA policy validated on Wazuh 4.14.8 and Ubuntu 24.04.5 LTS with Apache 2.4.58 and PHP 8.3.6.*
