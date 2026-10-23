@@ -398,7 +398,7 @@ The rules, decoder and SCA policy were validated in a lab with the following ver
 
 ## Acknowledgments
 
-Special thanks to Katia Bukcovak and Farouk Musa from the Wazuh team for their support of the Ambassador Program and for the technical review of this work.
+Special thanks to Katia Bukcovac and Farouk Musa from the Wazuh team for their support of the Ambassador Program and for the technical review of this work.
 
 ---
 
