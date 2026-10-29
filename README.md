@@ -15,7 +15,7 @@ Two CVEs describe the issues, titled as in the PHP security advisory:
 - **CVE-2026-109618, RCE via OOM corruption**: out-of-memory handling can interrupt PHP while internal request data is only partially initialized, and request cleanup may then treat the invalid data as valid.
 - **CVE-2026-109619, RCE via stale global state**: request-owned internal state can survive after its backing memory has been freed, and a later request handled by the same worker may use that stale state before normal initialization resets it.
 
-The researchers also describe a remote process-memory disclosure in which reclaimed heap contents are URL-encoded into a `PHPSESSID` response cookie. The advisory lists its interim measures under each CVE separately, and the rules in this repository treat the observable symptoms as consistent with both CVEs.
+Wiz Research also describes a remote process-memory disclosure in which reclaimed heap contents are URL-encoded into a `PHPSESSID` response cookie. The advisory lists its interim measures under each CVE separately, and the rules in this repository treat the observable symptoms as consistent with both CVEs.
 
 Researchers demonstrated unauthenticated RCE against WordPress, Drupal and Joomla.
 
@@ -60,7 +60,7 @@ The rules detect the observable pre-conditions and symptoms described in the off
 - **CVE attribution.** Rule 100131 and the README now follow the titles in the PHP advisory and name both CVEs.
 - **No cookies in alerts.** Rules 100130 and 100131 use `no_full_log`, and the decoder no longer extracts the `Set-Cookie` header into a field. Rule 100131 matches the raw log line inside the analysis engine, so the cookie values are never stored in the alert. A sibling decoder stores only the first 8 characters of a `PHPSESSID` cookie in `data.phpsessid_prefix`, enough to see the shape of an anomalous value.
 - **`same_srcip`.** Rules 100101 and 100120 use `same_srcip`.
-- **SCA effective values.** Checks 109601 to 109603 pass when the installed package carries the vendor backport, or when the interim mitigation is effective. The effective value is computed by the PHP CLI started with the Apache `php.ini` and the Apache `conf.d` scan directory, and read with `ini_get()`, so every drop-in is applied in the order PHP loads them. A patched host is no longer penalized for interim mitigations it does not need.
+- **SCA effective values.** Checks 109601 to 109604 pass when the installed package carries the vendor backport, or when the interim mitigation is effective. The effective value is computed by the PHP CLI started with the Apache `php.ini` and the Apache `conf.d` scan directory, and read with `ini_get()`, so every drop-in is applied in the order PHP loads them. A patched host is no longer penalized for interim mitigations it does not need.
 - **SCA check 109604.** New check that searches `/etc/apache2` and the `.htaccess` files under `/var/www` for `php_value`, `php_admin_value`, `php_flag` and `php_admin_flag` lines that undo a mitigation. Commented lines are ignored, and `php_admin_value memory_limit -1`, the setting the advisory recommends, is not flagged.
 
 ---
