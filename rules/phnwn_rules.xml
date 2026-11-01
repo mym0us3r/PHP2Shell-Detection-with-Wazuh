@@ -1,0 +1,90 @@
+<!--
+  Local rules for the PHNwn2Shell sensor - PHP2Shell (CVE-2026-109618 / CVE-2026-109619)
+  Scope: events written by the PHNwn2Shell passive honeypot sensor (PHP persona
+  on ports 80 and 443, Node.js persona on port 3000). The sensor answers like
+  a PHP or Node.js site and never executes what it receives. These rules
+  classify the requests it logs by the stage field the sensor assigns.
+
+  Author: Kislley Rodrigues - Wazuh Ambassador
+
+  References:
+    https://www.php.net/archive/2026.php#2026-10-21-5
+    https://www.wiz.io/blog/php2shell-php-rce
+    https://calif.io/php2shell/
+
+  Design notes:
+    - The sensor writes one JSON event per request. The native JSON decoder
+      flattens nested objects into dotted field names, for example
+      event.module, event.action, phnwn.stage and ioc.url_count.
+    - Rule 100220 is the base rule: it matches the sensor module and the
+      http_request action. Every other rule is a child of 100220 or of 100226
+      and selects one value of phnwn.stage.
+    - Stages with a rule: recon (100221), probe and arm (100222), oom_probe
+      (100223), br_probe (100224), br_large (100225) and exploit (100226).
+      The survey and deviation stages alert only through the base rule.
+    - Rule 100227 is a child of 100226 and fires when the exploit-stage
+      payload carried at least one URL (ioc.url_count of 1 or more). The
+      extracted URLs are in ioc.urls_csv. Benign URLs such as documentation
+      domains and XML namespaces are present in that field, so filter them
+      before treating an alert as an indicator of compromise.
+    - A single alert is an observation of what a scanner sent to a decoy.
+      It does not mean that any real system was compromised.
+
+  Custom rule block: 100220 - 100229
+-->
+<group name="phnwn,honeypot,">
+  <rule id="100220" level="5">
+    <decoded_as>json</decoded_as>
+    <field name="event.module">^phnwn2shell$</field>
+    <field name="event.action">^http_request$</field>
+    <description>PHNwn2Shell: request from $(srcip) on $(phnwn.persona) persona</description>
+  </rule>
+
+  <rule id="100221" level="6">
+    <if_sid>100220</if_sid>
+    <field name="phnwn.stage">^recon$</field>
+    <description>PHNwn2Shell: scanner recon ($(phnwn.tool)) from $(srcip)</description>
+  </rule>
+
+  <rule id="100222" level="8">
+    <if_sid>100220</if_sid>
+    <field name="phnwn.stage">^probe$|^arm$</field>
+    <description>PHNwn2Shell: PHP2Shell probe/arm stage ($(phnwn.stage)) from $(srcip)</description>
+    <mitre><id>T1190</id></mitre>
+  </rule>
+
+  <rule id="100223" level="10">
+    <if_sid>100220</if_sid>
+    <field name="phnwn.stage">^oom_probe$</field>
+    <description>PHNwn2Shell: PHP2Shell OOM-corruption probe from $(srcip)</description>
+    <mitre><id>T1190</id></mitre>
+  </rule>
+
+  <rule id="100224" level="10">
+    <if_sid>100220</if_sid>
+    <field name="phnwn.stage">^br_probe$</field>
+    <description>PHNwn2Shell: Content-Encoding br request from $(srcip)</description>
+    <mitre><id>T1190</id></mitre>
+  </rule>
+
+  <rule id="100225" level="12">
+    <if_sid>100220</if_sid>
+    <field name="phnwn.stage">^br_large$</field>
+    <description>PHNwn2Shell: large Brotli body (Node2Shell/HTTP2Shell pattern) from $(srcip)</description>
+    <mitre><id>T1190</id></mitre>
+  </rule>
+
+  <rule id="100226" level="12">
+    <if_sid>100220</if_sid>
+    <field name="phnwn.stage">^exploit$</field>
+    <description>PHNwn2Shell: exploit-stage payload (command, code or session path) from $(srcip)</description>
+    <mitre><id>T1190</id><id>T1059</id></mitre>
+  </rule>
+
+  <rule id="100227" level="13">
+    <if_sid>100226</if_sid>
+    <field name="ioc.url_count" type="pcre2">^[1-9]</field>
+    <description>PHNwn2Shell: payload URL IoC extracted ($(ioc.urls_csv)) from $(srcip)</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+</group>
