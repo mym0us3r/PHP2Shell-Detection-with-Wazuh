@@ -2,7 +2,14 @@
 
 > **Detection engineering for the PHP2Shell memory-safety flaws · Apache mod_php on Linux · lab-validated on Ubuntu 24.04 LTS**
 
-Wazuh 4.14.8 | 6 rules | 3 decoders | SCA policy with 5 checks | MITRE T1190, T1499, T1005 | CVSS v4 9.2
+> **Update (November 1, 2026 - 12:00, UTC-3):** v1.2 adds a post-exploitation layer. Rules 100140 and 100141 flag commands run by the web server account (auditd), and rules 100142, 100143 and 100144 flag PHP files created, modified and deleted under `/var/www` (FIM). All five rules were validated with real events in the Wazuh Dashboard.
+>
+> Prints (in `docs/`):
+>
+> - `rules_100140_100141.png`
+> - `rules_100142_100143_100144.png`
+
+![wazuh: 4.14.x series](https://img.shields.io/badge/wazuh-4.14.x%20series-005571) ![validated on: 4.14.8](https://img.shields.io/badge/validated%20on-4.14.8-005571) ![status: lab-validated](https://img.shields.io/badge/status-lab--validated-4c1) ![platform: Linux](https://img.shields.io/badge/platform-Linux-555) ![PHP2Shell: CVE-2026-109618 and 109619](https://img.shields.io/badge/PHP2Shell-CVE--2026--109618%20and%20109619-d73a49) ![Vuln: PHP2Shell](https://img.shields.io/badge/family-PHP2Shell-d73a49) ![Vuln: HTTP2Shell](https://img.shields.io/badge/family-HTTP2Shell-d73a49) ![Vuln: Node2Shell](https://img.shields.io/badge/family-Node2Shell-d73a49) ![sensor: PHNwn2Shell](https://img.shields.io/badge/sensor-PHNwn2Shell-6f42c1) ![type: HoneyPot](https://img.shields.io/badge/type-HoneyPot-6f42c1) ![custom rules: 11](https://img.shields.io/badge/custom%20rules-11-4c1) ![decoders: 3](https://img.shields.io/badge/decoders-3-4c1) ![SCA checks: 5](https://img.shields.io/badge/SCA%20checks-5-4c1) ![telemetry: auditd](https://img.shields.io/badge/telemetry-auditd-fe7d37) ![telemetry: FIM](https://img.shields.io/badge/telemetry-FIM-fe7d37) ![telemetry: Apache logs](https://img.shields.io/badge/telemetry-Apache%20logs-fe7d37) ![CVSS: v4 9.2](https://img.shields.io/badge/CVSS-v4%209.2-d73a49) ![MITRE: T1190](https://img.shields.io/badge/MITRE-T1190-d73a49) ![MITRE: T1499](https://img.shields.io/badge/MITRE-T1499-d73a49) ![MITRE: T1005](https://img.shields.io/badge/MITRE-T1005-d73a49) ![MITRE: T1059](https://img.shields.io/badge/MITRE-T1059-d73a49) ![MITRE: T1505](https://img.shields.io/badge/MITRE-T1505-d73a49) ![MITRE: T1070](https://img.shields.io/badge/MITRE-T1070-d73a49)  
 
 ---
 
@@ -55,6 +62,17 @@ The rules detect the observable pre-conditions and symptoms described in the off
 
 ---
 
+## What Changed in v1.2
+
+- **A third layer.** Layers 1 and 2 above are unchanged. v1.2 adds a post-exploitation layer: what happens on the host after a request succeeds.
+- **auditd.** New `auditd/php2shell.rules` records every `execve` made by the Apache account (`euid=33`, key `php2shell_exec`). Rule 100140 (level 8) flags any process started by that account. Rule 100141 (level 12) is the high-confidence subset: a shell, interpreter or download tool. The key is not in the native `audit-keys` list, so native rule 80792 does not also fire.
+- **FIM.** Rule 100142 (level 10) flags a new PHP-executable file (`.php`, `.php[0-9]`, `.phtml`, `.phar`, `.pht`, `.phps`) under `/var/www`, rule 100143 (level 8) flags a modified one, and rule 100144 (level 6) flags a deleted one. They inherit from the native FIM rules 554, 550 and 553.
+- **Rule IDs.** The new rules stay inside this repository's block (100100 to 100199). Rules 100100 to 100131, the decoder and the SCA policy are unchanged.
+- **References.** The header of `php2shell_rules.xml` now lists the Wazuh documentation for system call monitoring and file integrity monitoring.
+- **Validation.** Rules 100140 and 100141 were tested with `wazuh-logtest` and with real auditd events. Rules 100142, 100143 and 100144 were tested with a real file created, modified and deleted under `/var/www/html`. The evidence is in the Validation and Validation Evidence (v1.2) sections.
+
+---
+
 ## What Changed in v1.1
 
 - **CVE attribution.** Rule 100131 and the README now follow the titles in the PHP advisory and name both CVEs.
@@ -90,13 +108,16 @@ PHP2Shell-Detection-with-Wazuh/
 ├── SECURITY.md                              # Vulnerability reporting policy
 │
 ├── rules/
-│   └── php2shell_rules.xml                  # 6 Wazuh rules (100100-100131)
+│   └── php2shell_rules.xml                  # 11 Wazuh rules (100100-100144)
 │
 ├── decoders/
 │   └── php2shell_decoders.xml               # parent decoder and two sibling field decoders for the php2shell access log
 │
 ├── apache/
 │   └── php2shell-logformat.conf             # LogFormat and CustomLog for Apache 2.4
+│
+├── auditd/
+│   └── php2shell.rules                      # execve audit rules for the Apache account (key php2shell_exec)
 │
 ├── sca/
 │   └── php2shell_cve_2026_109618_109619.yml # SCA policy - Ubuntu 24.04, PHP 8.3, mod_php
@@ -113,7 +134,9 @@ PHP2Shell-Detection-with-Wazuh/
     ├── sca_policy_revision.png              # SCA v1.1 final commands, patched endpoint (100%)
     ├── sca_policy_revision-2_score80.png    # SCA v1.1 final commands, mitigations through conf.d (80%)
     ├── sca_policy_revision-2_score20.png    # SCA v1.1 final commands, no mitigation and Apache override (20%)
-    └── sca_events.png                       # SCA events indexed in Discover (v1.0)
+    ├── sca_events.png                       # SCA events indexed in Discover (v1.0)
+    ├── rules_100140_100141.png              # Rules 100140 and 100141, commands run by the web server account
+    └── rules_100142_100143_100144.png       # Rules 100142, 100143 and 100144, PHP file created, modified and deleted
 ```
 
 ---
@@ -130,6 +153,11 @@ PHP2Shell-Detection-with-Wazuh/
 | **100120** | 31122, `same_srcip` | 5 HTTP 500 responses in 60 s from one IP | 8 | Logtest and Discover |
 | **100130** | php2shell-accesslog | Multipart request with `Transfer-Encoding: chunked` | 7 | Logtest and Discover |
 | **100131** | php2shell-accesslog | `PHPSESSID` response cookie with `%XX` bytes or 64+ characters | 10 | Logtest and Discover |
+| **100140** | 80700, key `php2shell_exec` | Any process executed by the web server account | 8 | Logtest and Discover |
+| **100141** | 100140 | Web server account started a shell, interpreter or download tool | 12 | Logtest and Discover |
+| **100142** | 554 | New PHP-executable file under `/var/www` | 10 | Discover |
+| **100143** | 550 | Modified PHP-executable file under `/var/www` | 8 | Discover |
+| **100144** | 553 | Deleted PHP-executable file under `/var/www` | 6 | Discover |
 
 > **Engineering notes from validation on Wazuh 4.14.8**
 >
@@ -138,6 +166,20 @@ PHP2Shell-Detection-with-Wazuh/
 > - Access log events with status 500 end at rule 31122, so 100120 uses 31122 and not 31120.
 > - The native `web-accesslog` decoder has a prematch that accepts extra tokens before the bracketed timestamp, so any combined-style prefix is claimed by it. The `php2shell` format is key=value without brackets, which the native decoder does not match.
 > - Rules 100130 and 100131 use `no_full_log`. Rule 100131 matches the raw log line with a PCRE2 `regex`, which still works when `full_log` is omitted from the alert.
+
+### Post-exploitation rules (v1.2)
+
+The rules above watch the request and the engine. These five rules watch what happens on the host after a request succeeds: a process started by the web server account, or a PHP file that appears, changes or disappears in the web root. They do not depend on Apache logs.
+
+**Rule 100140 - any process executed by the web server account (level 8, T1059).** The auditd rules in `auditd/php2shell.rules` record every `execve` made with `euid=33` under the key `php2shell_exec`. Rule 100140 inherits from native rule 80700 (auditd, messages grouped) and matches that key. A PHP process rarely starts other programs, so each hit is worth a look, but legitimate helpers such as a mail transfer agent used by `mail()` also raise it. Treat it as a hunting signal. The key is not in the native `audit-keys` list, so native rule 80792 does not fire for these events and there is no duplicate alert.
+
+**Rule 100141 - shell, interpreter or download tool started by the web server account (level 12, T1059.004).** It is a child of 100140 that matches the executable path: `sh`, `bash`, `dash`, `ash`, `zsh`, `busybox`, `python`, `perl`, `php`, `nc`, `ncat`, `netcat`, `curl` and `wget`, in `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin` and the `local` variants of these. These are the programs an attacker reaches for after code execution, so this is the rule to notify on. The alert description carries the executable, for example `/usr/bin/dash`.
+
+**Rule 100142 - new PHP-executable file in the web root (level 10, T1505.003).** It inherits from native FIM rule 554 (file added) and matches paths under `/var/www` that end in `.php`, `.php[0-9]`, `.phtml`, `.phar`, `.pht` or `.phps`. A web shell dropped after exploitation lands here. Deployments also create PHP files, so ignore your release directories in `<syscheck>` or override the level in a local rule.
+
+**Rule 100143 - modified PHP-executable file in the web root (level 8, T1505.003).** It inherits from native FIM rule 550 (checksum changed) with the same path match. It catches code implanted into an existing script. Updates of the application also modify PHP files.
+
+**Rule 100144 - deleted PHP-executable file in the web root (level 6, T1070.004).** It inherits from native FIM rule 553 (file deleted) with the same path match. Removing a dropped file is the indicator removal technique, so a 100144 on the same path as an earlier 100142 is the sequence to look for. The level is low on purpose because releases and plugin updates also delete PHP files.
 
 ### Decoder
 
@@ -221,6 +263,39 @@ systemctl restart wazuh-agent
 
 Checks 109601 to 109603 run the PHP CLI binary `php8.3` with the Apache `php.ini` and `conf.d`, so the `php8.3-cli` package must be installed on the endpoint. The policy was tested configured in the agent's local `ossec.conf`, where `sca.remote_commands` is not required for the command rules (`c:`) it uses. Delivery through centralized configuration (`agent.conf`) was not tested.
 
+### Step 5 - Collect post-exploitation telemetry (endpoint)
+
+Install and start auditd (Debian and Ubuntu), then install the audit rules, load them and confirm the key is active:
+
+```bash
+apt install -y auditd audispd-plugins
+systemctl enable --now auditd
+cp auditd/php2shell.rules /etc/audit/rules.d/php2shell.rules
+augenrules --load
+auditctl -l | grep php2shell_exec
+```
+
+`euid=33` is `www-data` on Debian and Ubuntu. Confirm it with `id -u www-data`, and use the Apache account UID of your distribution otherwise. Add the audit log and the web root to the endpoint `ossec.conf`:
+
+```xml
+<localfile>
+  <log_format>audit</log_format>
+  <location>/var/log/audit/audit.log</location>
+</localfile>
+
+<syscheck>
+  <directories realtime="yes" check_all="yes">/var/www/html</directories>
+</syscheck>
+```
+
+If the sites live in other directories under `/var/www`, add each one as another `<directories>` entry: the rules match any PHP-executable path under `/var/www`. If a `<syscheck>` block already exists in the file, add only the `<directories>` line to it. Restart the agent:
+
+```bash
+systemctl restart wazuh-agent
+```
+
+Rules 100140 and 100141 need `auditd` running on the endpoint. Web applications that deploy by writing or removing PHP files will raise 100142, 100143 and 100144, so exclude release directories with an `<ignore>` entry in `<syscheck>` or override the rule level in a local rule.
+
 ---
 
 ## Validation
@@ -269,6 +344,39 @@ while (true) { $a[] = str_repeat('A', 1048576); }
 # Rules 100100, 100101 and 100120 - save the script above as /var/www/html/oom_test.php
 for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w '%{http_code} ' http://localhost/oom_test.php; done; echo
 ```
+
+### auditd rules by logtest (manager, v1.2)
+
+The three lines below are auditd records written in the format of the decoder example in the Wazuh ruleset. Run each one on the manager:
+
+```bash
+echo 'type=SYSCALL msg=audit(1762005000.123:9001): arch=c000003e syscall=59 success=yes exit=0 a0=55d0c8a0 a1=55d0c8c0 a2=55d0c8e0 a3=7ffd1a2b3c4d items=2 ppid=1234 pid=1240 auid=4294967295 uid=33 gid=33 euid=33 suid=33 fsuid=33 egid=33 sgid=33 fsgid=33 tty=(none) ses=4294967295 comm="dash" exe="/usr/bin/dash" key="php2shell_exec"' | /var/ossec/bin/wazuh-logtest 2>&1 | grep -E 'name:|audit\.(key|exe|euid)|id:|level:|description:|Alert to be generated|\*\*Phase'
+
+echo 'type=SYSCALL msg=audit(1762005001.456:9002): arch=c000003e syscall=59 success=yes exit=0 a0=55d0c8a0 a1=55d0c8c0 a2=55d0c8e0 a3=7ffd1a2b3c4d items=2 ppid=1240 pid=1241 auid=4294967295 uid=33 gid=33 euid=33 suid=33 fsuid=33 egid=33 sgid=33 fsgid=33 tty=(none) ses=4294967295 comm="id" exe="/usr/bin/id" key="php2shell_exec"' | /var/ossec/bin/wazuh-logtest 2>&1 | grep -E 'name:|audit\.(key|exe|euid)|id:|level:|description:|Alert to be generated|\*\*Phase'
+
+echo 'type=SYSCALL msg=audit(1762005002.789:9003): arch=c000003e syscall=59 success=yes exit=0 a0=55d0c8a0 a1=55d0c8c0 a2=55d0c8e0 a3=7ffd1a2b3c4d items=2 ppid=1240 pid=1242 auid=4294967295 uid=33 gid=33 euid=33 suid=33 fsuid=33 egid=33 sgid=33 fsgid=33 tty=(none) ses=4294967295 comm="id" exe="/usr/bin/id" key="audit-wazuh-c"' | /var/ossec/bin/wazuh-logtest 2>&1 | grep -E 'audit\.(key|exe)|id:|level:|description:|Alert to be generated|\*\*Phase'
+```
+
+Observed result: the decoder is `auditd` and the fields `audit.key`, `audit.exe` and `audit.euid` are extracted. Line 1 (`/usr/bin/dash`) fires rule 100141 (level 12, `T1059.004`). Line 2 (`/usr/bin/id`) fires rule 100140 (level 8, `T1059`) and does not reach 100141. Line 3 uses the native key `audit-wazuh-c`: only native rule 80792 fires, and rules 100140 and 100141 stay silent.
+
+### auditd and FIM rules on real events (v1.2)
+
+Run these on the endpoint after Step 5. Each command is a benign action and does not exploit anything:
+
+```bash
+# Rules 100141 (the shell) and 100140 (the id command it starts)
+sudo -u www-data /bin/sh -c 'id'
+sudo ausearch -k php2shell_exec -i --start recent
+
+# Rule 100142 (new PHP file), then 100143 (modified PHP file), then 100144 (deleted PHP file)
+echo '<?php // php2shell v1.2 test ?>' | sudo tee /var/www/html/php2shell_v12_test.php >/dev/null
+sleep 8
+echo '<?php // php2shell v1.2 test, modified ?>' | sudo tee /var/www/html/php2shell_v12_test.php >/dev/null
+sleep 8
+sudo rm -f /var/www/html/php2shell_v12_test.php
+```
+
+Observed result: `ausearch` returns the raw records with `key=php2shell_exec` and `euid=www-data` for `exe=/usr/bin/dash` and `exe=/usr/bin/id`. Each execution of the command raises rule 100141 (the shell) and rule 100140 (the `id` process). The file sequence raises rule 100142 at 12:00:39, rule 100143 at 12:00:47 and rule 100144 at 12:00:55, all for `/var/www/html/php2shell_v12_test.php`. Check them in Discover with `rule.id:(100140 OR 100141 OR 100142 OR 100143 OR 100144)`.
 
 ---
 
@@ -336,6 +444,24 @@ The shell logic of the five checks was also exercised outside Wazuh against 35 c
 
 ---
 
+## Validation Evidence (v1.2)
+
+The screenshots in this section come from the Wazuh Dashboard on the agent `phnwn2shell-01`, an Ubuntu endpoint with auditd and FIM in real time on `/var/www/html`, reporting to the Wazuh 4.14.8 manager. That endpoint has no Apache or PHP installed, because rules 100140 to 100144 depend on the `www-data` UID and on the `/var/www` path, not on the web server process.
+
+### Rules 100140 and 100141 - commands run by the web server account
+
+Two runs of `sudo -u www-data /bin/sh -c 'id'`, at 11:57:35 and 11:57:41 (UTC-3). Each run produces rule 100141 for the shell (`/usr/bin/dash`, level 12) and rule 100140 for the `id` process it starts (`/usr/bin/id`, level 8). `data.audit.euid` and `data.audit.uid` are 33 in every alert.
+
+![Rules 100140 and 100141](docs/rules_100140_100141.png)
+
+### Rules 100142, 100143 and 100144 - PHP file created, modified and deleted
+
+One test file, `/var/www/html/php2shell_v12_test.php`, created at 12:00:39 (rule 100142, level 10), modified at 12:00:47 (rule 100143, level 8) and deleted at 12:00:55 (rule 100144, level 6).
+
+![Rules 100142, 100143 and 100144](docs/rules_100142_100143_100144.png)
+
+---
+
 ## SCA Policy Summary
 
 Scope: Ubuntu 24.04 LTS, PHP 8.3, Apache 2 with mod_php. The policy only runs where `/etc/php/8.3/apache2/php.ini` and the `php8.3-common` package exist.
@@ -361,6 +487,11 @@ The effective value of a directive is what `ini_get()` returns when the PHP CLI 
 - **PHP-FPM was not tested.** The lab runs mod_php. The rules operate on Apache logs, but exploitation paths differ on PHP-FPM, as described by the researchers. The policy reads the Apache SAPI configuration only and does not cover FPM pool settings.
 - **SCA effective values come from the files of the Apache SAPI.** `ini_get()` reflects `php.ini` and `conf.d` and needs the `php8.3-cli` package. Check 109604 searches `/etc/apache2` and `.htaccess` files under `/var/www`. It does not read `.htaccess` files elsewhere, configuration included from outside `/etc/apache2`, `[PATH=]` and `[HOST=]` sections, or values set by the application at runtime. `post_max_size` overrides are matched for values in M, G or 9 or more digits of bytes.
 - **The SCA policy is specific to Ubuntu 24.04 with PHP 8.3 and Apache mod_php.** Other distributions and PHP branches need their own revision checks.
+- **The v1.2 rules were validated with benign commands and a test file.** Rules 100140 to 100144 were exercised with `sudo -u www-data /bin/sh -c 'id'` and a PHP file created, modified and deleted under `/var/www/html`, not with a live PHP2Shell exploitation.
+- **The auditd rules are tied to one UID.** `auditd/php2shell.rules` uses `euid=33`. On RHEL-family hosts or custom Apache accounts the value must change, otherwise nothing is recorded. PHP-FPM pools running under another user are not covered unless that UID is added.
+- **Rule 100140 is broad by design.** Legitimate helpers started by the web server, such as a mail transfer agent used by `mail()`, raise it. Use rule 100141 for notifications and keep 100140 for hunting.
+- **FIM is path and extension based.** Rules 100142, 100143 and 100144 do not inspect content, and a web shell written with another extension that the server still executes is not matched. FIM in `realtime` mode relies on inotify watch limits for large trees.
+- **FIM does not tell who wrote the file.** `whodata` mode adds the user and process, but it depends on auditd and on its own audit rules, which were not tested together with `php2shell.rules`.
 
 ---
 
@@ -396,6 +527,8 @@ The rules, decoder and SCA policy were validated in a lab with the following ver
 - Agent OS: Ubuntu 24.04.5 LTS
 - Web server: Apache 2.4.58 (prefork, mod_php)
 - PHP: 8.3.6 (package 8.3.6-0ubuntu0.24.04.13 is the patched build)
+
+The auditd and FIM rules (100140 to 100144) were validated on a second Wazuh agent, `phnwn2shell-01`, an Ubuntu endpoint with auditd and FIM in real time on `/var/www/html`, reporting to the same 4.14.8 manager. That endpoint has no Apache or PHP installed.
 
 ## Acknowledgments
 
