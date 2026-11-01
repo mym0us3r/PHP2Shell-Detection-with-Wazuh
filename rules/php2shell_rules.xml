@@ -9,6 +9,9 @@
     https://www.php.net/archive/2026.php#2026-10-21-5
     https://www.wiz.io/blog/php2shell-php-rce
     https://calif.io/php2shell/
+    https://wazuh.com/blog/detecting-php2shell-remote-code-execution-with-wazuh/
+    https://documentation.wazuh.com/current/user-manual/capabilities/system-calls-monitoring/index.html
+    https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/index.html
 
   Design notes:
     - Native rule 31420 (PHP Fatal error) inherits from 31402/31405, which
@@ -21,6 +24,13 @@
       and correlate repetition by source IP, which is the observable
       signal called out by the advisory and the researchers. They do not
       claim that a single event proves exploitation.
+    - Post-exploitation layer (100140 - 100144): rules 100140 and 100141
+      inherit from native rule 80700 (auditd, messages grouped) and match the
+      audit key php2shell_exec from auditd/php2shell.rules. That key is not
+      in the native audit-keys list, so native rule 80792 does not fire for
+      it. Rules 100142, 100143 and 100144 inherit from the native FIM rules
+      554 (added), 550 (modified) and 553 (deleted) and match the file path
+      in the "file" field.
 
   Custom rule block: 100100 - 100199
 -->
@@ -110,6 +120,75 @@
       <id>T1005</id>
     </mitre>
     <group>pci_dss_6.5,pci_dss_11.4,nist_800_53_SI.4,tsc_CC6.1,tsc_CC6.6,tsc_CC7.1,</group>
+  </rule>
+
+  <!-- ===== Post-exploitation layer (v1.2): auditd and FIM ===== -->
+
+  <!-- Any process executed by the Apache account. Requires the auditd rules in
+       auditd/php2shell.rules (key php2shell_exec) and the audit.log localfile
+       with log_format audit. The key is not in the native audit-keys list, so
+       native rule 80792 does not fire for it and there is no duplicate alert.
+       Apache with mod_php rarely executes anything: hits here still include
+       legitimate helpers (mail transfer agents, crash handlers), so tune. -->
+  <rule id="100140" level="8">
+    <if_sid>80700</if_sid>
+    <field name="audit.key" type="pcre2">^php2shell_exec$</field>
+    <description>Process executed by the web server account: $(audit.exe). Possible post-exploitation after PHP2Shell (CVE-2026-109618/109619); also seen with legitimate helpers.</description>
+    <mitre>
+      <id>T1059</id>
+    </mitre>
+    <group>php2shell,audit_command,pci_dss_10.2.7,nist_800_53_AU.14,tsc_CC6.8,tsc_CC7.2,</group>
+  </rule>
+
+  <!-- The web server account started a shell, interpreter or download tool.
+       This is the high-confidence subset of 100140. -->
+  <rule id="100141" level="12">
+    <if_sid>100140</if_sid>
+    <field name="audit.exe" type="pcre2">^(?:/usr)?(?:/local)?/s?bin/(?:sh|bash|dash|ash|zsh|busybox|python[0-9.]*|perl[0-9.]*|php[0-9.]*|nc|ncat|netcat|curl|wget)$</field>
+    <description>Web server account started a shell, interpreter or download tool: $(audit.exe). Consistent with command execution after PHP2Shell (CVE-2026-109618/109619).</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>php2shell,audit_command,pci_dss_10.2.7,nist_800_53_AU.14,tsc_CC6.8,tsc_CC7.2,</group>
+  </rule>
+
+  <!-- FIM: a new PHP-executable file under /var/www. Requires syscheck on
+       /var/www or on the web root. A web shell dropped after exploitation
+       lands here. Deployments also create PHP files: ignore your release
+       paths with a syscheck ignore entry or a local override. -->
+  <rule id="100142" level="10">
+    <if_sid>554</if_sid>
+    <field name="file" type="pcre2">(?i)^/var/www/.+\.(?:php[0-9]?|phtml|phar|pht|phps)$</field>
+    <description>New PHP-executable file in the web root: $(file). Possible web shell after PHP2Shell (CVE-2026-109618/109619).</description>
+    <mitre>
+      <id>T1505.003</id>
+    </mitre>
+    <group>php2shell,syscheck,pci_dss_11.5,nist_800_53_SI.7,tsc_CC6.1,tsc_CC7.2,</group>
+  </rule>
+
+  <!-- FIM: an existing PHP-executable file under /var/www was modified. -->
+  <rule id="100143" level="8">
+    <if_sid>550</if_sid>
+    <field name="file" type="pcre2">(?i)^/var/www/.+\.(?:php[0-9]?|phtml|phar|pht|phps)$</field>
+    <description>PHP-executable file modified in the web root: $(file). Possible web shell implant after PHP2Shell (CVE-2026-109618/109619).</description>
+    <mitre>
+      <id>T1505.003</id>
+    </mitre>
+    <group>php2shell,syscheck,pci_dss_11.5,nist_800_53_SI.7,tsc_CC6.1,tsc_CC7.2,</group>
+  </rule>
+
+  <!-- FIM: a PHP-executable file under /var/www was deleted. Removing a
+       dropped file is the indicator removal technique T1070.004. Releases
+       and plugin updates also delete PHP files, so the level is low: use
+       it to correlate with 100142 on the same path. -->
+  <rule id="100144" level="6">
+    <if_sid>553</if_sid>
+    <field name="file" type="pcre2">(?i)^/var/www/.+\.(?:php[0-9]?|phtml|phar|pht|phps)$</field>
+    <description>PHP-executable file deleted from the web root: $(file). Possible removal of a web shell after PHP2Shell (CVE-2026-109618/109619); also seen on releases and updates.</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+    <group>php2shell,syscheck,pci_dss_11.5,nist_800_53_SI.7,tsc_CC6.1,tsc_CC7.2,</group>
   </rule>
 
 </group>
