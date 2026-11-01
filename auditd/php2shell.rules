@@ -1,0 +1,8 @@
+## PHP2Shell detection (CVE-2026-109618 / CVE-2026-109619) - auditd rules
+## Records every execve made by the Apache account so Wazuh rules 100140 and 100141
+## can flag post-exploitation commands. Install as /etc/audit/rules.d/php2shell.rules
+##
+## euid=33 is www-data on Debian and Ubuntu. On RHEL-family systems Apache runs as
+## apache (euid 48): change the value, or confirm yours with:  id -u www-data
+-a always,exit -F arch=b64 -S execve -F euid=33 -k php2shell_exec
+-a always,exit -F arch=b32 -S execve -F euid=33 -k php2shell_exec
