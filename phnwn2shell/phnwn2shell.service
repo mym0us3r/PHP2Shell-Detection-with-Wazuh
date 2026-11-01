@@ -1,0 +1,80 @@
+# PHNwn2Shell - passive IoC sensor (HTTP honeypot) for PHP2Shell, Node2Shell and HTTP2Shell
+#
+# Purpose: log what scanners and exploit tools send to a decoy that answers like
+# a PHP/Apache site (ports 80 and 443) or a Node.js/Express site (port 3000),
+# and feed those events to Wazuh as one JSON line per request. The sensor never
+# executes what it receives, makes no outbound connections and downloads nothing.
+#
+# This file: systemd unit that runs the sensor as an unprivileged user in a sandbox.
+#
+# Author: Kislley Rodrigues - Wazuh Ambassador
+#
+# References:
+#   https://www.php.net/archive/2026.php#2026-10-21-5
+#   https://www.wiz.io/blog/php2shell-php-rce
+#   https://calif.io/php2shell/
+#
+# Part of PHP2Shell-Detection-with-Wazuh. Wazuh rules: rules/phnwn_rules.xml
+# Installation: phnwn2shell/INSTALL.md
+
+[Unit]
+Description=PHNwn2Shell - passive PHP2Shell/Node2Shell/HTTP2Shell IoC sensor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=phnwn
+Group=phnwn
+WorkingDirectory=/opt/phnwn2shell
+Environment=PHNWN_DATA_DIR=/var/lib/phnwn2shell
+EnvironmentFile=-/etc/phnwn2shell.env
+ExecStart=/usr/bin/python3 -B -s -m phnwn2shell
+Restart=on-failure
+RestartSec=5
+StateDirectory=phnwn2shell
+StateDirectoryMode=0750
+UMask=0027
+
+# Privileges
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap @reboot @raw-io @debug @cpu-emulation @obsolete
+SystemCallErrorNumber=EPERM
+
+# Filesystem
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+ReadWritePaths=/var/lib/phnwn2shell
+InaccessiblePaths=-/var/ossec
+
+# Network: inbound only. No fetcher exists in the code; this also blocks AF_UNIX/NETLINK.
+RestrictAddressFamilies=AF_INET AF_INET6
+
+# Resources
+MemoryMax=512M
+TasksMax=128
+CPUQuota=60%
+LimitNOFILE=1024
+LimitFSIZE=64M
+
+[Install]
+WantedBy=multi-user.target
