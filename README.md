@@ -1,6 +1,6 @@
 # PHP2Shell Detection with Wazuh 4.14.8 (4.14.x series) - CVE-2026-109618 and CVE-2026-109619
 
-> **Detection engineering for the PHP2Shell memory-safety flaws · Apache mod_php on Linux · lab-validated on Ubuntu 24.04 LTS**
+**Detection engineering for the PHP2Shell memory-safety flaws · Apache mod_php on Linux · lab-validated on Ubuntu 24.04 LTS**
 
 > **Update (November 1, 2026 - 12:00, UTC-3):** v1.2 adds a post-exploitation layer. Rules 100140 and 100141 flag commands run by the web server account (auditd), and rules 100142, 100143 and 100144 flag PHP files created, modified and deleted under `/var/www` (FIM). All five rules were validated with real events in the Wazuh Dashboard.
 >
@@ -9,7 +9,7 @@
 > - `rules_100140_100141.png`
 > - `rules_100142_100143_100144.png`
 
-![wazuh: 4.14.x series](https://img.shields.io/badge/wazuh-4.14.x%20series-005571) ![validated on: 4.14.8](https://img.shields.io/badge/validated%20on-4.14.8-005571) ![status: lab-validated](https://img.shields.io/badge/status-lab--validated-4c1) ![platform: Linux](https://img.shields.io/badge/platform-Linux-555) ![PHP2Shell: CVE-2026-109618 and 109619](https://img.shields.io/badge/PHP2Shell-CVE--2026--109618%20and%20109619-d73a49) ![Vuln: PHP2Shell](https://img.shields.io/badge/family-PHP2Shell-d73a49) ![Vuln: HTTP2Shell](https://img.shields.io/badge/family-HTTP2Shell-d73a49) ![Vuln: Node2Shell](https://img.shields.io/badge/family-Node2Shell-d73a49) ![sensor: PHNwn2Shell](https://img.shields.io/badge/sensor-PHNwn2Shell-6f42c1) ![type: HoneyPot](https://img.shields.io/badge/type-HoneyPot-6f42c1) ![custom rules: 11](https://img.shields.io/badge/custom%20rules-11-4c1) ![decoders: 3](https://img.shields.io/badge/decoders-3-4c1) ![SCA checks: 5](https://img.shields.io/badge/SCA%20checks-5-4c1) ![telemetry: auditd](https://img.shields.io/badge/telemetry-auditd-fe7d37) ![telemetry: FIM](https://img.shields.io/badge/telemetry-FIM-fe7d37) ![telemetry: Apache logs](https://img.shields.io/badge/telemetry-Apache%20logs-fe7d37) ![CVSS: v4 9.2](https://img.shields.io/badge/CVSS-v4%209.2-d73a49) ![MITRE: T1190](https://img.shields.io/badge/MITRE-T1190-d73a49) ![MITRE: T1499](https://img.shields.io/badge/MITRE-T1499-d73a49) ![MITRE: T1005](https://img.shields.io/badge/MITRE-T1005-d73a49) ![MITRE: T1059](https://img.shields.io/badge/MITRE-T1059-d73a49) ![MITRE: T1505](https://img.shields.io/badge/MITRE-T1505-d73a49) ![MITRE: T1070](https://img.shields.io/badge/MITRE-T1070-d73a49)  
+![wazuh: 4.14.x series](https://img.shields.io/badge/wazuh-4.14.x%20series-005571) ![validated on: 4.14.8](https://img.shields.io/badge/validated%20on-4.14.8-005571) ![status: lab-validated](https://img.shields.io/badge/status-lab--validated-4c1) ![platform: Linux](https://img.shields.io/badge/platform-Linux-555) ![PHP2Shell: CVE-2026-109618 and 109619](https://img.shields.io/badge/PHP2Shell-CVE--2026--109618%20and%20109619-d73a49) ![Vuln: PHP2Shell](https://img.shields.io/badge/family-PHP2Shell-d73a49) ![Vuln: HTTP2Shell](https://img.shields.io/badge/family-HTTP2Shell-d73a49) ![Vuln: Node2Shell](https://img.shields.io/badge/family-Node2Shell-d73a49) ![sensor: PHNwn2Shell](https://img.shields.io/badge/sensor-PHNwn2Shell-6f42c1) ![type: HoneyPot](https://img.shields.io/badge/type-HoneyPot-6f42c1) ![custom rules: 11](https://img.shields.io/badge/custom%20rules-11-4c1) ![decoders: 3](https://img.shields.io/badge/decoders-3-4c1) ![SCA checks: 5](https://img.shields.io/badge/SCA%20checks-5-4c1) ![telemetry: auditd](https://img.shields.io/badge/telemetry-auditd-fe7d37) ![telemetry: FIM](https://img.shields.io/badge/telemetry-FIM-fe7d37) ![telemetry: Apache logs](https://img.shields.io/badge/telemetry-Apache%20logs-fe7d37) ![CVSS: v4 9.2](https://img.shields.io/badge/CVSS-v4%209.2-d73a49) ![MITRE: T1190](https://img.shields.io/badge/MITRE-T1190-d73a49) ![MITRE: T1499](https://img.shields.io/badge/MITRE-T1499-d73a49) ![MITRE: T1005](https://img.shields.io/badge/MITRE-T1005-d73a49) ![MITRE: T1059](https://img.shields.io/badge/MITRE-T1059-d73a49) ![MITRE: T1505](https://img.shields.io/badge/MITRE-T1505-d73a49) ![MITRE: T1070](https://img.shields.io/badge/MITRE-T1070-d73a49)
 
 ---
 
@@ -108,7 +108,8 @@ PHP2Shell-Detection-with-Wazuh/
 ├── SECURITY.md                              # Vulnerability reporting policy
 │
 ├── rules/
-│   └── php2shell_rules.xml                  # 11 Wazuh rules (100100-100144)
+│   ├── php2shell_rules.xml                  # 11 Wazuh rules (100100-100144)
+│   └── phnwn_rules.xml                      # 8 Wazuh rules of the PHNwn2Shell sensor (100220-100227)
 │
 ├── decoders/
 │   └── php2shell_decoders.xml               # parent decoder and two sibling field decoders for the php2shell access log
