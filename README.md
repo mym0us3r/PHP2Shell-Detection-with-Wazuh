@@ -120,6 +120,15 @@ PHP2Shell-Detection-with-Wazuh/
 ├── auditd/
 │   └── php2shell.rules                      # execve audit rules for the Apache account (key php2shell_exec)
 │
+├── phnwn2shell/
+│   ├── README.md                            # PHNwn2Shell sensor: purpose, stages, events and rules
+│   ├── INSTALL.md                           # Step-by-step installation of the sensor
+│   ├── __init__.py                          # Package definition and version
+│   ├── __main__.py                          # Entry point: python3 -m phnwn2shell
+│   ├── analysis.py                          # Request analysis, IoC extraction and stage assignment
+│   ├── server.py                            # HTTP listeners (PHP and Node.js personas) and event writer
+│   └── phnwn2shell.service                  # systemd unit (unprivileged user, sandboxed)
+│
 ├── sca/
 │   └── php2shell_cve_2026_109618_109619.yml # SCA policy - Ubuntu 24.04, PHP 8.3, mod_php
 │
